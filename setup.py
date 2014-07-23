@@ -94,7 +94,6 @@ setup(
         ),
       Extension("bob.ip.flandmark._library",
         [
-
           "bob/ip/flandmark/flandmark.cpp",
           "bob/ip/flandmark/main.cpp",
         ],
