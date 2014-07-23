@@ -39,6 +39,10 @@ the following paper::
     www = {http://www.visapp.visigrapp.org},
   }
 
+.. note::
+  Since version 2.1, bob.ip.flandmark relies on the **new** implementation of Flandmark, which is now part of `CLandmark <#>`_.
+  The API has not changed, though, only the models are now in a (readable) XML format.
+
 You should also cite `Bob`_, as a core framework, in which these bindings are
 based on::
 

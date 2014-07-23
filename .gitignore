@@ -1,4 +1,5 @@
 *~
+.*
 *.swp
 *.pyc
 bin
@@ -15,6 +16,8 @@ dist
 build
 *.so
 src/
+clandmark/3rd_party/CImg-1.5.6/
+clandmark/matlab_interface/mex*/
 xbob.extension*.egg
 .gdb_history
 core

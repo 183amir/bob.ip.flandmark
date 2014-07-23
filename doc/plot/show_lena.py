@@ -14,7 +14,7 @@ lena = get_data('lena.jpg')
 lena_gray = rgb_to_gray(lena)
 x, y, width, height = [214, 202, 183, 183] #or from OpenCV
 localizer = Flandmark()
-keypoints = localizer.locate(lena_gray, y, x, height, width)
+keypoints = localizer.locate(lena_gray, (y, x), (height, width))
 
 # draw the keypoints and bounding box
 box(lena, (y, x), (height, width), (255, 0, 0)) # red bounding box

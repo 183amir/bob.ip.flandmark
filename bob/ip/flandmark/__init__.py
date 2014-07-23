@@ -29,5 +29,5 @@ from pkg_resources import resource_filename
 import os.path
 from ._library import __set_default_model__
 __set_default_model__(resource_filename(__name__,
-  os.path.join('data', 'flandmark_model.dat')))
+  os.path.join('data', '8Lfrontal_LFW_SPLIT_1.xml')))
 del resource_filename, __set_default_model__, os

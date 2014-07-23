@@ -13,11 +13,8 @@
  Users Guide
 =============
 
-Flandmark detects 8 coordinates of important keypoints in **frontal** human
-faces. To properly work, the keypoint localizer requires the input of an image
-(of type ``uint8``, gray-scaled) and of a bounding box describing a rectangle
-where the face is supposed to be located in the image (see
-:py:class:`bob.ip.flandmark.Flandmark.locate`).
+In its default setup, Flandmark detects 8 coordinates of important keypoints in **frontal** human faces.
+To properly work, the keypoint localizer requires the input of an image (of type ``uint8``, gray-scaled) and of a bounding box describing a rectangle where the face is supposed to be located in the image (see :py:class:`bob.ip.flandmark.Flandmark.locate`).
 
 The keypoints returned are, in this order:
 
@@ -28,7 +25,6 @@ The keypoints returned are, in this order:
   Canthus-rl (inner corner of the right eye).
 
   .. note::
-
      The "right eye" means the right eye at the face w.r.t. the person on the
      image. That is the left eye in the image, from the viewer's perspective.
 
@@ -50,18 +46,14 @@ The keypoints returned are, in this order:
 [7]
   Nose
 
-Each point is returned as tuple defining the pixel positions in the form
-``(y, x)``.
+Each point is returned as tuple defining the pixel positions in the form ``(y, x)``.
 
-The input bounding box describes the rectangle coordinates using 4 values:
-``(y, x, height, width)``. Square bounding boxes, i.e. when ``height ==
-width``, will give best results.
+The input bounding box describes the rectangle coordinates using 2 tuple values: ``(y, x)`` and ``(height, width)``.
+Square bounding boxes, i.e. when ``height == width``, will give best results.
 
-If you don't know the bounding box coordinates of faces on the provided image,
-you will need to either manually annotate them or use an automatic face
-detector. OpenCV_, if compiled with Python support, provides an easy to use
-frontal face detector. The code below shall detect most frontal faces in a
-provided (gray-scaled) image:
+If you don't know the bounding box coordinates of faces on the provided image, you will need to either manually annotate them or use an automatic face detector.
+OpenCV_, if compiled with Python support, provides an easy to use frontal face detector.
+The code below shall detect most frontal faces in a provided (gray-scaled) image:
 
 .. doctest::
    :options: +NORMALIZE_WHITESPACE, +ELLIPSIS
@@ -79,13 +71,12 @@ provided (gray-scaled) image:
    >>> print(face_bbxs)
    [[...]]
 
-The function ``detectMultiScale`` returns OpenCV_ rectangles as 2D
-:py:class:`numpy.ndarray`'s. Each row corresponds to a detected face at the
-input image. Notice the format of each bounding box differs from that of Bob_.
+The function ``detectMultiScale`` returns OpenCV_ rectangles as 2D :py:class:`numpy.ndarray`'s.
+Each row corresponds to a detected face at the input image.
+Notice the format of each bounding box differs from that of Bob_.
 Their format is ``(x, y, width, height)``.
 
-Once in possession of bounding boxes for the provided (gray-scaled) image, you
-can find the keypoints in the following way:
+Once in possession of bounding boxes for the provided (gray-scaled) image, you can find the keypoints in the following way:
 
 .. doctest::
    :options: +NORMALIZE_WHITESPACE, +ELLIPSIS
@@ -93,12 +84,12 @@ can find the keypoints in the following way:
    >>> x, y, width, height = face_bbxs[0]
    >>> from bob.ip.flandmark import Flandmark
    >>> localizer = Flandmark()
-   >>> keypoints = localizer.locate(lena_gray, y, x, height, width)
+   >>> keypoints = localizer.locate(lena_gray, (y, x), (height, width))
    >>> keypoints
    array([[...]])
 
-You can use the package ``bob.ip.draw`` to draw the rectangles and keypoints
-on the target image. A complete script would be something like:
+You can use the package ``bob.ip.draw`` to draw the rectangles and keypoints on the target image.
+A complete script would be something like:
 
 .. plot:: plot/show_lena.py
    :include-source: True

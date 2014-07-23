@@ -17,7 +17,8 @@
 
 #include <cstring>
 
-#include "flandmark_detector.h"
+#include <Flandmark.h>
+#include <CImg.h>
 
 /******************************************
  * Implementation of Localizer base class *
@@ -26,37 +27,30 @@
 #define CLASS_NAME "Flandmark"
 
 static auto s_class = bob::extension::ClassDoc(
-    BOB_EXT_MODULE_PREFIX "." CLASS_NAME,
-
-    "A key-point localization for faces using Flandmark",
-
-    "This class can be used to locate facial landmarks on pre-detected faces. "
-    "You input an image and a bounding-box specification and it returns you the "
-    "positions for multiple key-points for the given face image.\n"
-    "\n"
-    "Consult http://cmp.felk.cvut.cz/~uricamic/flandmark/index.php for more "
-    "information.\n"
-    "\n"
+  BOB_EXT_MODULE_PREFIX "." CLASS_NAME,
+  "A key-point localization for faces using Flandmark",
+  "This class can be used to locate facial landmarks on pre-detected faces. "
+  "You input an image and a bounding-box specification and it returns you the positions for multiple key-points for the given face image.\n\n"
+  "Consult http://cmp.felk.cvut.cz/~uricamic/flandmark/index.php for more information."
+)
+.add_constructor(
+  bob::extension::FunctionDoc(
+    CLASS_NAME,
+    "Constructor",
+    "Initializes the key-point locator with a model."
     )
-    .add_constructor(
-        bob::extension::FunctionDoc(
-          CLASS_NAME,
-          "Constructor",
-          "Initializes the key-point locator with a model."
-          )
-        .add_prototype("[model]", "")
-        .add_parameter("model", "str (path), optional", "Path to the localization model. If not set (or set to ``None``), then use the default localization model, stored on the class variable ``__default_model__``)")
-        )
-    ;
+  .add_prototype("[model]", "")
+  .add_parameter("model", "str (path), optional", "Path to the localization model. If not set (or set to ``None``), then use the default localization model, stored on the class variable ``__default_model__``)")
+)
+;
 
 typedef struct {
   PyObject_HEAD
-  FLANDMARK_Model* flandmark;
+  clandmark::Flandmark* flandmark;
   char* filename;
 } PyBobIpFlandmarkObject;
 
-static int PyBobIpFlandmark_init
-(PyBobIpFlandmarkObject* self, PyObject* args, PyObject* kwds) {
+static int PyBobIpFlandmark_init (PyBobIpFlandmarkObject* self, PyObject* args, PyObject* kwds) {
 
   /* Parses input arguments in a single shot */
   static const char* const_kwlist[] = {"model", 0};
@@ -64,12 +58,10 @@ static int PyBobIpFlandmark_init
 
   PyObject* model = 0;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O&", kwlist,
-        &PyBobIo_FilenameConverter, &model)) return -1;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O&", kwlist, &PyBobIo_FilenameConverter, &model)) return -1;
 
   if (!model) { //use what is stored in __default_model__
-    PyObject* default_model = PyObject_GetAttrString((PyObject*)self,
-        "__default_model__");
+    PyObject* default_model = PyObject_GetAttrString((PyObject*)self, "__default_model__");
     if (!default_model) {
       PyErr_Format(PyExc_RuntimeError, "`%s' needs a model to properly initialize, but the user has not passed one and `__default_model__' is not properly set", Py_TYPE(self)->tp_name);
       return -1;
@@ -93,7 +85,7 @@ static int PyBobIpFlandmark_init
   //now we have a filename we can use
   if (!c_filename) return -1;
 
-  self->flandmark = flandmark_init(c_filename);
+  self->flandmark = clandmark::Flandmark::getInstanceOf(c_filename);
   if (!self->flandmark) {
     PyErr_Format(PyExc_RuntimeError, "`%s' could not initialize from model file `%s'", Py_TYPE(self)->tp_name, c_filename);
     return -1;
@@ -102,67 +94,50 @@ static int PyBobIpFlandmark_init
   //flandmark is now initialized, set filename
   self->filename = strndup(c_filename, 256);
 
-  //all good, flandmark is ready
+  // all good, flandmark is ready
   return 0;
 
 }
 
 static void PyBobIpFlandmark_delete (PyBobIpFlandmarkObject* self) {
-  flandmark_free(self->flandmark);
+  // not sure if this is the best thing to do...
+  delete self->flandmark;
   self->flandmark = 0;
   free(self->filename);
   self->filename = 0;
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static void delete_image(IplImage* i) {
-  cvReleaseImage(&i);
-}
-
 /**
  * Returns a list of key-point annotations given an image and an iterable over
  * bounding boxes.
  */
-static PyObject* call(PyBobIpFlandmarkObject* self,
-    boost::shared_ptr<IplImage> image, int nbbx, boost::shared_array<int> bbx) {
+static PyObject* call(PyBobIpFlandmarkObject* self, boost::shared_ptr<cimg_library::CImg<unsigned char>> image, int nbbx, boost::shared_array<int> bbx) {
 
   PyObject* retval = PyTuple_New(nbbx);
   if (!retval) return 0;
   auto retval_ = make_safe(retval);
 
   for (int i=0; i<nbbx; ++i) {
-
-    //allocate output array _and_ Flandmark buffer within a single structure
-    Py_ssize_t shape[2];
-    shape[0] = self->flandmark->data.options.M;
-    shape[1] = 2;
-    PyObject* landmarks = PyArray_SimpleNew(2, shape, NPY_FLOAT64);
-    if (!landmarks) return 0;
-    auto landmarks_ = make_safe(landmarks);
-    double* buffer = reinterpret_cast<double*>(PyArray_DATA((PyArrayObject*)landmarks));
-
-    int result = 0;
+    // detect face in the given bounding boc
     Py_BEGIN_ALLOW_THREADS
-    result = flandmark_detect(image.get(), &bbx[4*i], self->flandmark, buffer);
+    self->flandmark->detect(image.get(), &bbx[4*i]);
     Py_END_ALLOW_THREADS
 
-    if (result != NO_ERR) {
-      Py_INCREF(Py_None);
-      landmarks = Py_None;
-    }
-    else {
-      //swap keypoint coordinates (x, y) -> (y, x)
-      double tmp;
-      for (int k = 0; k < (2*self->flandmark->data.options.M); k += 2) {
-        tmp         = buffer[k];
-        buffer[k]   = buffer[k+1];
-        buffer[k+1] = tmp;
-      }
-      Py_INCREF(landmarks);
+    double* detected = self->flandmark->getLandmarks();
+
+    Py_ssize_t shape[2] = {self->flandmark->getLandmarksCount(), 2};
+    PyBlitzArrayObject* landmarks = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_FLOAT64, 2, shape);
+    blitz::Array<double,2> lm = *PyBlitzArrayCxx_AsBlitz<double,2>(landmarks);
+
+    for (int i = 0; i < self->flandmark->getLandmarksCount(); ++i){
+      // y -> 0
+      lm(i, 0) = detected[2*i+1];
+      // x -> 1
+      lm(i, 1) = detected[2*i];
     }
 
-    PyTuple_SET_ITEM(retval, i, landmarks);
-
+    PyTuple_SET_ITEM(retval, i, PyBlitzArray_AsNumpyArray(landmarks, 0));
   }
 
   Py_INCREF(retval);
@@ -172,80 +147,66 @@ static PyObject* call(PyBobIpFlandmarkObject* self,
 
 static auto s_call = bob::extension::FunctionDoc(
     "locate",
-    "Locates keypoints on a **single** facial bounding-box on the provided image."
-    "This method will locate 8 keypoints inside the bounding-box defined "
-    "for the current input image, organized in this way:\n"
-    "\n"
+    "Locates keypoints on a **single** facial bounding-box on the provided image. "
+    "This function returns a list of detected keypoints, which depends on the specified model, "
+    "For the default models, the keypoints are organized in this way:\n\n"
     "0. Face center\n"
-    "1. Canthus-rl (inner corner of the right eye).\n"
-    "\n"
-    "   .. note::\n"
-    "      \n"
-    "      The \"right eye\" means the right eye at the face w.r.t. the person "
-    "on the image. That is the left eye in the image, from the viewer's "
-    "perspective.\n"
-    "\n"
+    "1. Canthus-rl (inner corner of the right eye).\n\n"
+    ".. note:: The \"right eye\" means the right eye at the face w.r.t. the person on the image. "
+    "That is the left eye in the image, from the viewer's perspective.\n\n"
     "2. Canthus-lr (inner corner of the left eye)\n"
     "3. Mouth-corner-r (right corner of the mouth)\n"
     "4. Mouth-corner-l (left corner of the mouth)\n"
     "5. Canthus-rr (outer corner of the right eye)\n"
     "6. Canthus-ll (outer corner of the left eye)\n"
-    "7. Nose\n"
-    "\n"
-    "Each point is returned as tuple defining the pixel positions in the form "
-    "(y, x).\n"
-    "\n"
+    "7. Nose\n\n"
+    "Each point is returned as tuple defining the pixel positions in the form (y, x)."
     )
-    .add_prototype("image, y, x, height, width", "landmarks")
+    .add_prototype("image, offset, size", "landmarks")
     .add_parameter("image", "array-like (2D, uint8)",
       "The image Flandmark will operate on")
-    .add_parameter("y, x", "int", "The top left-most corner of the bounding box containing the face image you want to locate keypoints on.")
-    .add_parameter("height, width", "int", "The dimensions accross ``y`` (height) and ``x`` (width) for the bounding box, in number of pixels.")
+    .add_parameter("offset", "(int, int)", "The top left-most corner of the bounding box containing the face image you want to locate keypoints on.")
+    .add_parameter("size", "(int, int)", "The dimensions accross y (height) and x (width) for the bounding box, in number of pixels.")
     .add_return("landmarks", "array (2D, float64)", "Each row in the output array contains the locations of keypoints in the format ``(y, x)``")
     ;
 
-static PyObject* PyBobIpFlandmark_call_single(PyBobIpFlandmarkObject* self,
-    PyObject *args, PyObject* kwds) {
+static PyObject* PyBobIpFlandmark_call_single(PyBobIpFlandmarkObject* self, PyObject *args, PyObject* kwds) {
 
   /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {"image", "y", "x", "height", "width", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+  static char* kwlist[] = {const_cast<char*>("image"), const_cast<char*>("offset"), const_cast<char*>("size"), 0};
 
   PyBlitzArrayObject* image = 0;
-  int y = 0;
-  int x = 0;
-  int height = 0;
-  int width = 0;
+  blitz::TinyVector<int,2> position, size;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&iiii", kwlist,
-        &PyBlitzArray_Converter, &image, &y, &x, &height, &width)) return 0;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&(ii)(ii)", kwlist, &PyBlitzArray_Converter, &image, &position[0], &position[1], &size[0], &size[1])) return 0;
 
   auto image_ = make_safe(image);
 
-  //check
+  // check
   if (image->type_num != NPY_UINT8 || image->ndim != 2) {
     PyErr_Format(PyExc_TypeError, "`%s' input `image' data must be a 2D array with dtype `uint8' (i.e. a gray-scaled image), but you passed a %" PY_FORMAT_SIZE_T "d array with data type `%s'", Py_TYPE(self)->tp_name, image->ndim, PyBlitzArray_TypenumAsString(image->type_num));
     return 0;
   }
 
-  // converts to OpenCV's IplImage
-  boost::shared_ptr<IplImage> cv_image(cvCreateImage(cvSize(image->shape[1], image->shape[0]), IPL_DEPTH_8U, 1), std::ptr_fun(delete_image));
+  blitz::Array<uint8_t,2> blitz_image = *PyBlitzArrayCxx_AsBlitz<uint8_t, 2>(image);
 
-  // copy image data aligned (see http://chi3x10.wordpress.com/2008/05/07/be-aware-of-memory-alignment-of-iplimage-in-opencv)
-  for (int yy = 0; yy < image->shape[0]; ++yy)
-    std::copy(reinterpret_cast<char*>(image->data) + yy * image->shape[1], reinterpret_cast<char*>(image->data) + (yy+1) * image->shape[1], cv_image->imageData + yy * cv_image->widthStep);
+	boost::shared_ptr<cimg_library::CImg<unsigned char>> cimg_image( new cimg_library::CImg<unsigned char>(blitz_image.extent(1), blitz_image.extent(0)) );
 
-  //prepares the bbx vector
+	for (int x = 0; x < blitz_image.extent(1); ++x)
+		for (int y = 0; y < blitz_image.extent(0); ++y)
+			(*cimg_image)(x, y) = blitz_image(y, x);
+
+  // prepares the bbx vector
   boost::shared_array<int> bbx(new int[4]);
-  bbx[0] = x;
-  bbx[1] = y;
-  bbx[2] = x + width;
-  bbx[3] = y + height;
+  bbx[0] = position[1];
+  bbx[1] = position[0];
+  bbx[2] = position[1] + size[1];
+  bbx[3] = position[0] + size[0];
 
-  PyObject* retval = call(self, cv_image, 1, bbx);
+  PyObject* retval = call(self, cimg_image, 1, bbx);
   if (!retval) return 0;
 
-  //gets the first entry, return it
+  // gets the first entry, return it
   PyObject* retval0 = PyTuple_GET_ITEM(retval, 0);
   if (!retval0) return 0;
 
@@ -285,44 +246,36 @@ PyObject* PyBobIpFlandmark_Repr(PyBobIpFlandmarkObject* self) {
 #endif
 
   return retval;
-
 }
 
 PyTypeObject PyBobIpFlandmark_Type = {
-    PyVarObject_HEAD_INIT(0, 0)
-    s_class.name(),                            /* tp_name */
-    sizeof(PyBobIpFlandmarkObject),            /* tp_basicsize */
-    0,                                         /* tp_itemsize */
-    (destructor)PyBobIpFlandmark_delete,       /* tp_dealloc */
-    0,                                         /* tp_print */
-    0,                                         /* tp_getattr */
-    0,                                         /* tp_setattr */
-    0,                                         /* tp_compare */
-    (reprfunc)PyBobIpFlandmark_Repr,           /* tp_repr */
-    0,                                         /* tp_as_number */
-    0,                                         /* tp_as_sequence */
-    0,                                         /* tp_as_mapping */
-    0,                                         /* tp_hash */
-    (ternaryfunc)PyBobIpFlandmark_call_single, /* tp_call */
-    (reprfunc)PyBobIpFlandmark_Repr,           /* tp_str */
-    0,                                         /* tp_getattro */
-    0,                                         /* tp_setattro */
-    0,                                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /* tp_flags */
-    s_class.doc(),                             /* tp_doc */
-    0,                                         /* tp_traverse */
-    0,                                         /* tp_clear */
-    0,                                         /* tp_richcompare */
-    0,                                         /* tp_weaklistoffset */
-    0,                                         /* tp_iter */
-    0,                                         /* tp_iternext */
-    PyBobIpFlandmark_methods,                  /* tp_methods */
-    0,                                         /* tp_members */
-    0,                                         /* tp_getset */
-    0,                                         /* tp_base */
-    0,                                         /* tp_dict */
-    0,                                         /* tp_descr_get */
-    0,                                         /* tp_descr_set */
-    0,                                         /* tp_dictoffset */
-    (initproc)PyBobIpFlandmark_init,           /* tp_init */
+  PyVarObject_HEAD_INIT(0, 0)
+  0
 };
+
+bool init_BobIpFlandmark(PyObject* module){
+  // initialize the type struct
+  PyBobIpFlandmark_Type.tp_name = s_class.name();
+  PyBobIpFlandmark_Type.tp_basicsize = sizeof(PyBobIpFlandmarkObject);
+  PyBobIpFlandmark_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+  PyBobIpFlandmark_Type.tp_doc = s_class.doc();
+
+  // set the functions
+  PyBobIpFlandmark_Type.tp_new = PyType_GenericNew;
+  PyBobIpFlandmark_Type.tp_init = reinterpret_cast<initproc>(PyBobIpFlandmark_init);
+  PyBobIpFlandmark_Type.tp_dealloc = reinterpret_cast<destructor>(PyBobIpFlandmark_delete);
+  PyBobIpFlandmark_Type.tp_methods = PyBobIpFlandmark_methods;
+  PyBobIpFlandmark_Type.tp_call = reinterpret_cast<ternaryfunc>(PyBobIpFlandmark_call_single);
+
+  // representations
+  PyBobIpFlandmark_Type.tp_repr = (reprfunc)PyBobIpFlandmark_Repr;
+  PyBobIpFlandmark_Type.tp_str = (reprfunc)PyBobIpFlandmark_Repr;
+
+  // check that everything is fine
+  if (PyType_Ready(&PyBobIpFlandmark_Type) < 0)
+    return false;
+
+  // add the type to the module
+  Py_INCREF(&PyBobIpFlandmark_Type);
+  return PyModule_AddObject(module, CLASS_NAME, (PyObject*)&PyBobIpFlandmark_Type) >= 0;
+}

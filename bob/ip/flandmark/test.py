@@ -138,7 +138,7 @@ def test_lena():
   (x, y, width, height) = LENA_BBX[0]
 
   flm = Flandmark()
-  keypoints = flm.locate(gray, y, x, height, width)
+  keypoints = flm.locate(gray, (y, x), (height, width))
   nose.tools.eq_(keypoints.shape, (8, 2))
   nose.tools.eq_(keypoints.dtype, 'float64')
   for k in keypoints:
@@ -166,7 +166,7 @@ def test_multi():
 
   flm = Flandmark()
   for (x, y, width, height) in MULTI_BBX:
-    keypoints = flm.locate(gray, y, x, height, width)
+    keypoints = flm.locate(gray, (y, x), (height, width))
     nose.tools.eq_(keypoints.shape, (8, 2))
     nose.tools.eq_(keypoints.dtype, 'float64')
     for k in keypoints:

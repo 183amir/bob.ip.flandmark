@@ -14,14 +14,15 @@
 #include <bob.extension/documentation.h>
 
 extern PyTypeObject PyBobIpFlandmark_Type;
+extern bool init_BobIpFlandmark(PyObject* module);
 
 static auto s_setter = bob::extension::FunctionDoc(
-    "__set_default_model__",
-    "Internal function to set the default model for the Flandmark class"
-    )
-    .add_prototype("path", "")
-    .add_parameter("path", "str", "The path to the new model file")
-    ;
+  "__set_default_model__",
+  "Internal function to set the default model for the Flandmark class"
+)
+.add_prototype("path", "")
+.add_parameter("path", "str", "The path to the new model file")
+;
 
 PyObject* set_flandmark_model(PyObject*, PyObject* o) {
 
@@ -78,8 +79,7 @@ static PyObject* create_module (void) {
     return 0;
 
   /* register the types to python */
-  Py_INCREF(&PyBobIpFlandmark_Type);
-  if (PyModule_AddObject(m, "Flandmark", (PyObject *)&PyBobIpFlandmark_Type) < 0) return 0;
+  if (!init_BobIpFlandmark(m)) return 0;
 
   /* imports dependencies */
   if (import_bob_blitz() < 0) {
