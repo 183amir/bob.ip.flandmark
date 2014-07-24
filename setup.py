@@ -8,9 +8,12 @@
 
 from setuptools import setup, find_packages, dist
 dist.Distribution(dict(setup_requires=['bob.blitz', 'bob.io.base']))
-from bob.blitz.extension import Extension
+from bob.blitz.extension import Extension, build_ext
 import bob.io.base
-import os, subprocess, shutil
+import os
+
+this_dir = os.path.dirname(os.path.realpath(__file__))
+package_dir = os.path.join(this_dir, 'bob', 'ip', 'flandmark')
 
 version = '2.1.0a0'
 packages = ['boost', 'opencv>=2.0', 'bob-io>=1.2.2']
@@ -20,36 +23,21 @@ libraries = ['clandmark', 'flandmark']
 macros = [('DOUBLE_PRECISION', '1')]
 
 
-from distutils.command.build_ext import build_ext
-from distutils.command.install_lib import install_lib
 
-build_dir = os.path.realpath("./build/clandmark")
-library_dirs = [os.path.join(build_dir, "libclandmark")]
-clandmark_libraries = []
-
-class MyBuildExtension(build_ext):
-  def run(self):
-    # compile the external code using CMake
-    if not os.path.exists(build_dir): os.makedirs(build_dir)
-    command = ['cmake', '../../clandmark', '-DBUILD_CPP_EXAMPLES=0', '-DBUILD_MATLAB_BINDINGS=0', '-DBUILD_PYTHON_BINDINGS=0', '-DBUILD_SHARED_LIBS=1', '-DDOUBLE_PRECISION=1', '-DCMAKE_BUILD_TYPE=RELEASE']
-    subprocess.call(command, cwd=build_dir)
-    env = {'VERBOSE' : '1'}
-    env.update(os.environ)
-    subprocess.call(['make'], cwd=build_dir, env=env)
-    # get the libraries
-    global clandmark_libraries
-    clandmark_libraries = [os.path.join(build_dir, 'libclandmark', l) for l in os.listdir(os.path.join(build_dir, 'libclandmark')) if '.so' in l]
-    # finally, run the base class install
-    return build_ext.run(self)
-
-
-class MyInstall(install_lib):
-  def install(self):
-    global clandmark_libraries
-    for l in clandmark_libraries: shutil.move(l, self.install_dir)
-    # return the libraries from the base class and those that we generated
-    return install_lib.install(self) + [os.path.join(self.install_dir, l.split(os.sep)[-1]) for l in clandmark_libraries]
-
+def compile_cmake(build_dir):
+  """Compiles the external clandmark and flandmark libraries using the original cmake files."""
+  import subprocess
+  # compile the external code using CMake
+  clandmark_dir = os.path.join(this_dir, 'clandmark')
+  # configure cmake
+  command = ['cmake', clandmark_dir, '-DBUILD_CPP_EXAMPLES=0', '-DBUILD_MATLAB_BINDINGS=0', '-DBUILD_PYTHON_BINDINGS=0', '-DBUILD_SHARED_LIBS=1', '-DDOUBLE_PRECISION=1', '-DCMAKE_BUILD_TYPE=RELEASE']
+  subprocess.call(command, cwd=build_dir)
+  # run make
+  env = {'VERBOSE' : '1'}
+  env.update(os.environ)
+  subprocess.call(['make'], cwd=build_dir, env=env)
+  # return the list of generated libraries
+  return  [os.path.join(build_dir, 'libclandmark', l) for l in os.listdir(os.path.join(build_dir, 'libclandmark')) if '.so' in l]
 
 
 # finally, call setup
@@ -97,10 +85,11 @@ setup(
           "bob/ip/flandmark/flandmark.cpp",
           "bob/ip/flandmark/main.cpp",
         ],
-        include_dirs = include_dirs,
-        library_dirs = library_dirs,
-        libraries = libraries,
+        internal_libraries = {package_dir : libraries},
+        internal_library_builder = {'clandmark' : compile_cmake},
+
         version = version,
+        include_dirs = include_dirs,
         packages = packages,
         define_macros = macros,
         boost_modules = ['system'],
@@ -108,12 +97,11 @@ setup(
       ],
 
     cmdclass = {
-      'build_ext': MyBuildExtension,
-      'install_lib': MyInstall
+      'build_ext': build_ext
     },
 
     classifiers = [
-      'Development Status :: 5 - Production/Stable',
+      'Development Status :: 4 - Development/Beta',
       'Intended Audience :: Developers',
       'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
       'Natural Language :: English',

@@ -14,7 +14,7 @@ dist
 .project
 .pydevproject
 build
-*.so
+*.so*
 src/
 clandmark/3rd_party/CImg-1.5.6/
 clandmark/matlab_interface/mex*/
