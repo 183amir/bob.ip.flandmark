@@ -6,20 +6,20 @@
 """Bindings for flandmark
 """
 
+bob_packages = ['bob.core', 'bob.io.base']
+
 from setuptools import setup, find_packages, dist
-dist.Distribution(dict(setup_requires=['bob.blitz', 'bob.io.base']))
+dist.Distribution(dict(setup_requires=['bob.blitz'] + bob_packages))
 from bob.blitz.extension import Extension, build_ext
-import bob.io.base
 import os
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
 package_dir = os.path.join(this_dir, 'bob', 'ip', 'flandmark')
 
 version = '2.1.0a0'
-packages = ['boost', 'opencv>=2.0', 'bob-io>=1.2.2']
 
-include_dirs = [bob.io.base.get_include(), 'clandmark/libclandmark', 'clandmark/3rd_party/CImg-1.5.6', 'clandmark/3rd_party/rapidxml-1.13']
-libraries = ['clandmark', 'flandmark']
+packages = ['boost', 'opencv>=2.0']
+boost_modules = ['system']
 macros = [('DOUBLE_PRECISION', '1')]
 
 
@@ -59,6 +59,7 @@ setup(
     install_requires=[
       'setuptools',
       'bob.blitz',
+      'bob.core',
       'bob.io.base',
       'bob.io.image', #for tests
       'bob.ip.color', #for tests
@@ -69,32 +70,32 @@ setup(
     namespace_packages=[
       "bob",
       "bob.ip",
-      ],
+    ],
 
     ext_modules=[
       Extension("bob.ip.flandmark.version",
         [
           "bob/ip/flandmark/version.cpp",
-          ],
-        include_dirs = include_dirs,
+        ],
+        bob_packages = bob_packages,
         version = version,
         packages = packages,
-        ),
+        boost_modules = boost_modules,
+      ),
+
       Extension("bob.ip.flandmark._library",
         [
           "bob/ip/flandmark/flandmark.cpp",
           "bob/ip/flandmark/main.cpp",
         ],
-        internal_libraries = {package_dir : libraries},
-        internal_library_builder = {'clandmark' : compile_cmake},
+        bob_packages = bob_packages,
 
         version = version,
         include_dirs = include_dirs,
         packages = packages,
-        define_macros = macros,
-        boost_modules = ['system'],
-        ),
-      ],
+        boost_modules = boost_modules,
+      ),
+    ],
 
     cmdclass = {
       'build_ext': build_ext
