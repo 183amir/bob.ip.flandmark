@@ -6,7 +6,7 @@
 """Bindings for flandmark
 """
 
-bob_packages = ['bob.core', 'bob.io.base']
+bob_packages = ['bob.core', 'bob.io.base', 'bob.io.image', 'bob.ip.color']
 
 from setuptools import setup, find_packages, dist
 dist.Distribution(dict(setup_requires=['bob.blitz'] + bob_packages))
@@ -21,6 +21,10 @@ version = '2.1.0a0'
 packages = ['boost', 'opencv>=2.0']
 boost_modules = ['system']
 macros = [('DOUBLE_PRECISION', '1')]
+
+include_dirs = ['clandmark/libclandmark', 'clandmark/3rd_party/CImg-1.5.6', 'clandmark/3rd_party/rapidxml-1.13']
+libraries = ['clandmark', 'flandmark']
+library_dirs = ['__build/libclandmark']
 
 
 
@@ -93,7 +97,10 @@ setup(
         version = version,
         include_dirs = include_dirs,
         packages = packages,
+        define_macros = macros,
         boost_modules = boost_modules,
+        libraries = libraries,
+        library_dirs = library_dirs,
       ),
     ],
 

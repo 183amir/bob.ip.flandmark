@@ -125,7 +125,7 @@ def test_lena_opencv():
   (x, y, width, height) = opencv_detect(gray)[0]
 
   flm = Flandmark()
-  keypoints = flm.locate(gray, y, x, height, width)
+  keypoints = flm.locate(gray, (y, x), (height, width))
   nose.tools.eq_(keypoints.shape, (8, 2))
   nose.tools.eq_(keypoints.dtype, 'float64')
   for k in keypoints:
@@ -153,7 +153,7 @@ def test_multi_opencv():
 
   flm = Flandmark()
   for (x, y, width, height) in bbx:
-    keypoints = flm.locate(gray, y, x, height, width)
+    keypoints = flm.locate(gray, (y, x), (height, width))
     nose.tools.eq_(keypoints.shape, (8, 2))
     nose.tools.eq_(keypoints.dtype, 'float64')
     for k in keypoints:
@@ -171,3 +171,13 @@ def test_multi():
     nose.tools.eq_(keypoints.dtype, 'float64')
     for k in keypoints:
       assert is_inside(k, (y, x, height, width), eps=1)
+
+  flm = Flandmark(F('Idiap_model.xml'))
+  for (x, y, width, height) in MULTI_BBX:
+    keypoints = flm.locate(gray, (y, x), (height, width))
+    nose.tools.eq_(keypoints.shape, (22, 2))
+    nose.tools.eq_(keypoints.dtype, 'float64')
+    for k in keypoints:
+      assert is_inside(k, (y-50, x-50, height+100, width+100), eps=1)
+
+
