@@ -22,6 +22,8 @@ packages = ['boost', "opencv>=2.0"]
 boost_modules = ['system']
 
 setup(
+    namespace_packages=['bob'],
+
 
     name="bob.ip.flandmark",
     version=version,
